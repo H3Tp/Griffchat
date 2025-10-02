@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import mongoose from 'mongoose';
+import { MongoClient } from 'mongodb';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
@@ -10,12 +10,13 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import dns from 'dns';
 
+// Routes
 import authRoutes from './routes/auth.js';
 import groupRoutes from './routes/groups.js';
 import channelRoutes from './routes/channels.js';
 import messageRoutes from './routes/messages.js';
 
-// DNS fix for Node.js
+// DNS fix for Node.js (Atlas SRV issue)
 dns.setDefaultResultOrder('ipv4first');
 
 // __dirname in ES Modules
@@ -35,16 +36,34 @@ const io = new SocketServer(httpServer, {
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 
+// Global DB variable
+let db;
+
+// MongoDB Connection
+async function connectDB() {
+  try {
+    const client = new MongoClient(process.env.MONGO_URI);
+    await client.connect();
+    db = client.db("griffchat_db"); // 👈 create/use database named griffchat_db
+    console.log("MongoDB connected");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  }
+}
+connectDB();
+
+// Attach db to req so routes can access it
+app.use((req, res, next) => {
+  req.db = db;
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);
-
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
 
 // Test Route
 app.get('/', (req, res) => {
@@ -67,3 +86,5 @@ io.on('connection', (socket) => {
 // Start server
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+export { db }; // 👈 export db so models can use it

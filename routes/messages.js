@@ -1,32 +1,39 @@
-import express from 'express';
-import Message from '../models/Message.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import express from "express";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import {
+  createMessage,
+  findMessagesByGroupAndChannel,
+} from "../models/Message.js";
 
 const router = express.Router();
 
-// Get messages by group + channel
-router.get('/:groupId/:channelId', authMiddleware, async (req, res) => {
+// 📌 Get messages by group + channel
+router.get("/:groupId/:channelId", authMiddleware, async (req, res) => {
   try {
     const { groupId, channelId } = req.params;
-    const messages = await Message.find({ group: groupId, channel: channelId }).populate('sender', 'email');
+
+    // Use helper function from models/Message.js
+    const messages = await findMessagesByGroupAndChannel(groupId, channelId);
+
     res.json(messages);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Send message
-router.post('/:groupId/:channelId', authMiddleware, async (req, res) => {
+// 📌 Send a message
+router.post("/:groupId/:channelId", authMiddleware, async (req, res) => {
   try {
     const { groupId, channelId } = req.params;
-    const msg = new Message({
-      group: groupId,
-      channel: channelId,
-      sender: req.user._id,
-      text: req.body.text
+
+    const msgId = await createMessage({
+      groupId,
+      channelId,
+      senderId: req.user._id, // set by authMiddleware
+      text: req.body.text,
     });
-    await msg.save();
-    res.json(msg);
+
+    res.json({ message: "Message sent", id: msgId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

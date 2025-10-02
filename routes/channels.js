@@ -1,99 +1,141 @@
-import express from 'express';
-import Channel from './models/Channel.js';
-import Group from '../models/Group.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
-import { roleMiddleware } from '../middleware/roleMiddleware.js';
+// server/routes/channels.js
+import express from "express";
+import {
+  createChannel,
+  findChannelsByGroup,
+  addMember,
+  removeMember,
+  Channels,
+} from "../models/Channel.js";
+import { Groups } from "../models/Group.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { authorizeRoles } from "../middleware/roleMiddleware.js";
+import { ObjectId } from "mongodb";
 
 const router = express.Router();
 
 /**
  * Create a channel inside a group
- * Access: group-admin of that group OR super
+ * Access: GroupAdmin or Super
  */
-router.post('/:groupId', authMiddleware, roleMiddleware(['group-admin', 'super']), async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const { name } = req.body;
+router.post(
+  "/:groupId",
+  authMiddleware,
+  authorizeRoles("GroupAdmin", "Super"),
+  async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { name } = req.body;
 
-    // check group exists
-    const group = await Group.findById(groupId);
-    if (!group) return res.status(404).json({ error: 'Group not found' });
+      // Check if group exists
+      const group = await Groups().findOne({ _id: new ObjectId(groupId) });
+      if (!group) return res.status(404).json({ error: "Group not found" });
 
-    const channel = new Channel({ name, group: groupId });
-    await channel.save();
+      const channelId = await createChannel({
+        name,
+        groupId,
+        createdBy: req.user._id,
+      });
 
-    res.json(channel);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+      res.json({ message: "Channel created", channelId });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
-});
+);
 
 /**
  * Delete a channel
- * Access: group-admin of that group OR super
+ * Access: GroupAdmin or Super
  */
-router.delete('/:channelId', authMiddleware, roleMiddleware(['group-admin', 'super']), async (req, res) => {
-  try {
-    const { channelId } = req.params;
-    await Channel.findByIdAndDelete(channelId);
-    res.json({ message: 'Channel deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+router.delete(
+  "/:channelId",
+  authMiddleware,
+  authorizeRoles("GroupAdmin", "Super"),
+  async (req, res) => {
+    try {
+      const { channelId } = req.params;
+
+      await Channels().deleteOne({ _id: new ObjectId(channelId) });
+
+      res.json({ message: "Channel deleted" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
-});
+);
 
 /**
  * List channels in a group
- * Access: any authenticated user who is a member of the group
+ * Access: any authenticated user in the group
  */
-router.get('/group/:groupId', authMiddleware, async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const channels = await Channel.find({ group: groupId });
-    res.json(channels);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+router.get(
+  "/group/:groupId",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const channels = await findChannelsByGroup(groupId);
+
+      res.json(channels);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
-});
+);
 
 /**
  * Ban a user from a channel
- * Access: group-admin of that group OR super
+ * Access: GroupAdmin or Super
  */
-router.post('/:channelId/ban/:userId', authMiddleware, roleMiddleware(['group-admin', 'super']), async (req, res) => {
-  try {
-    const { channelId, userId } = req.params;
-    const channel = await Channel.findById(channelId);
-    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+router.post(
+  "/:channelId/ban/:userId",
+  authMiddleware,
+  authorizeRoles("GroupAdmin", "Super"),
+  async (req, res) => {
+    try {
+      const { channelId, userId } = req.params;
 
-    if (!channel.banned.includes(userId)) {
-      channel.banned.push(userId);
-      await channel.save();
+      const channel = await Channels().findOne({ _id: new ObjectId(channelId) });
+      if (!channel) return res.status(404).json({ error: "Channel not found" });
+
+      await Channels().updateOne(
+        { _id: new ObjectId(channelId) },
+        { $addToSet: { banned: new ObjectId(userId) }, $set: { updatedAt: new Date() } }
+      );
+
+      res.json({ message: "User banned from channel" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
-
-    res.json({ message: 'User banned from channel' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
-});
+);
 
 /**
  * Unban a user from a channel
- * Access: group-admin of that group OR super
+ * Access: GroupAdmin or Super
  */
-router.post('/:channelId/unban/:userId', authMiddleware, roleMiddleware(['group-admin', 'super']), async (req, res) => {
-  try {
-    const { channelId, userId } = req.params;
-    const channel = await Channel.findById(channelId);
-    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+router.post(
+  "/:channelId/unban/:userId",
+  authMiddleware,
+  authorizeRoles("GroupAdmin", "Super"),
+  async (req, res) => {
+    try {
+      const { channelId, userId } = req.params;
 
-    channel.banned = channel.banned.filter(id => id.toString() !== userId);
-    await channel.save();
+      const channel = await Channels().findOne({ _id: new ObjectId(channelId) });
+      if (!channel) return res.status(404).json({ error: "Channel not found" });
 
-    res.json({ message: 'User unbanned from channel' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+      await Channels().updateOne(
+        { _id: new ObjectId(channelId) },
+        { $pull: { banned: new ObjectId(userId) }, $set: { updatedAt: new Date() } }
+      );
+
+      res.json({ message: "User unbanned from channel" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   }
-});
+);
 
 export default router;

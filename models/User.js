@@ -1,24 +1,58 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+import bcrypt from "bcryptjs";
+import { db } from "../server.js";
+import { ObjectId } from "mongodb";
 
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['Super', 'GroupAdmin', 'User'], default: 'User' }
-}, { timestamps: true });
+// Get the users collection
+export const Users = () => db.collection("users");
 
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+// Create a new user (with hashed password)
+export async function createUser({ name, email, password, role = "User" }) {
   const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
+  const hashedPassword = await bcrypt.hash(password, salt);
 
-// Password compare method
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
+  const result = await Users().insertOne({
+    name,
+    email: email.toLowerCase(), // normalize email
+    password: hashedPassword,
+    role,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
 
-export default mongoose.model('User', userSchema);
+  return result.insertedId;
+}
+
+// Find user by email
+export async function findUserByEmail(email) {
+  return await Users().findOne({ email: email.toLowerCase() });
+}
+
+// Find user by ID (exclude password)
+export async function findUserById(id) {
+  if (!ObjectId.isValid(id)) return null;
+
+  return await Users().findOne(
+    { _id: new ObjectId(id) },
+    { projection: { password: 0 } }
+  );
+}
+
+// Compare password
+export async function matchPassword(enteredPassword, hashedPassword) {
+  return await bcrypt.compare(enteredPassword, hashedPassword);
+}
+
+// Update user (example: profile update)
+export async function updateUser(id, updates) {
+  if (!ObjectId.isValid(id)) return null;
+
+  updates.updatedAt = new Date();
+
+  const result = await Users().findOneAndUpdate(
+    { _id: new ObjectId(id) },
+    { $set: updates },
+    { returnDocument: "after", projection: { password: 0 } }
+  );
+
+  return result.value;
+}
