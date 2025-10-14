@@ -149,8 +149,8 @@ export class AdminComponent {
     return this.groups.filter(g => g.admins.includes(me.username));
   }
   currentGroup(){ 
-    console.log(this.groups ,this.groupSel)
-    return this.groups.find(g => g.id === this.groupSel) || null; }
+    // console.log(this.groups ,this.groupSel)
+    return this.groups?.find(g => g.id === this.groupSel) || null; }
   canDeleteCurrent(){ const g = this.currentGroup(); if (!g) return false; if (this.isSuper) return true; const me=this.auth.currentUser(); return !!me && g.owner === me.username; }
 
   adminsText(){ return (this.currentGroup()?.admins || []).join(', '); }
