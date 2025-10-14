@@ -37,27 +37,26 @@ The app is built using the **MEAN stack (MongoDB, Express, Angular, Node.js)**.
 ## 🏗️ Repository Organization
 
 The project repository is structured as follows:
-
+```text
 griffchat/
 │
 ├── client/ # Angular Frontend
 │ ├── src/
 │ │ ├── app/
-│ │ │ ├── components/ # Chat, Login, Register components
-│ │ │ ├── services/ # API communication (HTTP requests)
-│ │ │ ├── models/ # TypeScript interfaces (User, Message, Group,channel)
+│ │ │ ├── components/ # Login, Chat, Register, Profile components
+│ │ │ ├── services/   # API communication (AuthService, ChatService)
+│ │ │ ├── models/     # TypeScript interfaces (User, Message, Group, Channel)
 │ │ │ └── app.module.ts
-│ │ └── assets/ # Static assets (icons, images)
+│ │ └── assets/
 │ └── angular.json
 │
 ├── server/ # Node.js + Express Backend
-│ ├── controllers/ # Handles HTTP requests
-│ ├── models/ # MongoDB Schemas 
-│ ├── routes/ # REST API route definitions
-| |
-│ ├── tests/ # Jest test cases
-│ ├── db.js # MongoDB connection setup
-│ └── server.js # Main server entry point
+│ ├── controllers/ # Handles HTTP requests and business logic
+│ ├── models/      # MongoDB Schemas (Mongoose)
+│ ├── routes/      # REST API route definitions
+│ ├── tests/       # Jest test cases
+│ ├── db.js        # MongoDB connection setup
+│ └── server.js    # Main server entry point
 │
 └── README.md # Documentation file
 
