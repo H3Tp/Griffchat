@@ -37,7 +37,7 @@ The app is built using the **MEAN stack (MongoDB, Express, Angular, Node.js)**.
 ## 🏗️ Repository Organization
 
 The project repository is structured as follows:
-
+```text
 griffchat/
 │
 ├── client/ # Angular Frontend
